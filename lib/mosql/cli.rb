@@ -7,8 +7,6 @@ module MoSQL
   class CLI
     include MoSQL::Logging
 
-    BATCH       = 1000
-
     attr_reader :args, :options, :tailer
 
     def self.run(args)
@@ -37,6 +35,7 @@ module MoSQL
         :collections => 'collections.yml',
         :sql    => 'postgres:///',
         :mongo  => 'mongodb://localhost',
+        :batch_size => 1000,
         :verbose => 0
       }
       optparse = OptionParser.new do |opts|
@@ -93,6 +92,10 @@ module MoSQL
 
         opts.on("--reimport", "Force a data re-import") do
           @options[:reimport] = true
+        end
+
+        opts.on("--batch-size [batch_size]", "Batch size to use when importing data (default:1000)") do |batch_size|
+          @options[:batch_size] = batch_size.to_i
         end
 
         opts.on("--no-drop-tables", "Don't drop the table if it exists during the initial import") do

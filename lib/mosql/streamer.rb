@@ -141,13 +141,13 @@ module MoSQL
 
       start    = Time.now
       sql_time = 0
-      collection.find(filter, :batch_size => BATCH) do |cursor|
+      collection.find(filter, :batch_size => batch_size) do |cursor|
         with_retries do
           cursor.each do |obj|
             batch << @schema.transform(ns, obj)
             count += 1
 
-            if batch.length >= BATCH
+            if batch.length >= batch_size
               sql_time += track_time do
                 bulk_upsert(table, ns, batch)
               end
