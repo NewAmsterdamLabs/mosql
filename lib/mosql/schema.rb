@@ -61,7 +61,10 @@ module MoSQL
       @map = {}
       map.each do |dbname, db|
         @map[dbname] = { :meta => parse_meta(db[:meta]) }
-        db.each do |cname, spec|
+        db.sort.each do |tuple|
+          cname = tuple[0]
+          spec = tuple[1]
+
           next unless cname.is_a?(String)
           begin
             @map[dbname][cname] = parse_spec("#{dbname}.#{cname}", spec)
