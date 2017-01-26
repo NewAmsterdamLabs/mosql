@@ -170,6 +170,10 @@ module MoSQL
       if tail_from.is_a? Time
         tail_from = tailer.most_recent_position(tail_from)
       end
+      # handle unix timestamp given via command line
+      if tail_from.is_a? Integer
+        tail_from = BSON::Timestamp.new(tail_from, 0)
+      end
       tailer.tail(:from => tail_from, :filter => options[:oplog_filter])
       until @done
         tailer.stream(1000) do |op|
