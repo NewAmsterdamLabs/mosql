@@ -45,6 +45,8 @@ module MoSQL
           log.error("Error processing #{obj.inspect} for #{ns}.")
           raise e
         end
+      rescue BSON::InvalidDocument => e
+        log.warn("Ignoring row (#{obj.inspect}): #{e}")
       end
     end
 
@@ -52,7 +54,7 @@ module MoSQL
       begin
         @schema.copy_data(table.db, ns, items)
       rescue Sequel::DatabaseError => e
-        log.debug("Bulk insert error (#{e}), attempting invidual upserts...")
+        log.debug("Bulk insert error (#{e}), attempting individual upserts...")
         cols = @schema.all_columns(@schema.find_ns(ns))
         items.each do |it|
           h = {}
@@ -109,7 +111,7 @@ module MoSQL
         spec = @schema.find_db(dbname)
 
         if(spec.nil?)
-          log.info("Mongd DB '#{dbname}' not found in config file. Skipping.")
+          log.info("Mongo DB '#{dbname}' not found in config file. Skipping.")
           next
         end
 
@@ -141,13 +143,13 @@ module MoSQL
 
       start    = Time.now
       sql_time = 0
-      collection.find(filter, :batch_size => batch_size) do |cursor|
+      collection.find(filter, :batch_size => BATCH) do |cursor|
         with_retries do
           cursor.each do |obj|
             batch << @schema.transform(ns, obj)
             count += 1
 
-            if batch.length >= batch_size
+            if batch.length >= BATCH
               sql_time += track_time do
                 bulk_upsert(table, ns, batch)
               end
@@ -169,10 +171,6 @@ module MoSQL
       tail_from = options[:tail_from]
       if tail_from.is_a? Time
         tail_from = tailer.most_recent_position(tail_from)
-      end
-      # handle unix timestamp given via command line
-      if tail_from.is_a? Integer
-        tail_from = BSON::Timestamp.new(tail_from, 0)
       end
       tailer.tail(:from => tail_from, :filter => options[:oplog_filter])
       until @done
