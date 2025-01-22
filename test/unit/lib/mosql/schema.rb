@@ -62,7 +62,6 @@ EOF
     Sequel.extension(:pg_array)
     @map = MoSQL::Schema.new(YAML.load(TEST_MAP))
   end
-
   it 'Loads the schema' do
     assert(@map)
   end
@@ -229,7 +228,7 @@ EOF
       assert_equal('AAAA', extra['embedded']['thing'].strip)
     end
 
-    it 'will treat arrays as strings when schame says to' do
+    it 'will treat arrays as strings when schema says to' do
       out = @map.transform('db.treat_array_as_string', {'_id' => 1, 'arry' => [1, 2, 3]})
       assert_equal(out[0], 1)
       assert_equal(out[1], '[1,2,3]')
@@ -307,7 +306,7 @@ EOF
 db:
   :meta:
     :alias: db_[0-9]+
-  collection:
+  :collection:
     :meta:
       :table: sqltable
     :columns:
