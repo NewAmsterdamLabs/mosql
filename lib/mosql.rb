@@ -1,4 +1,4 @@
-require 'log4r'
+require 'logger'
 require 'mongo'
 require 'sequel'
 require 'mongoriver'

@@ -113,13 +113,12 @@ module MoSQL
       end
 
       optparse.parse!(@args)
-
-      log = Log4r::Logger.new('Stripe')
-      log.outputters = Log4r::StdoutOutputter.new(STDERR)
+      
+      log = Logger::Logger.new(STDERR, 'Stripe')
       if options[:verbose] >= 1
-        log.level = Log4r::DEBUG
+        log.level = Logger::DEBUG
       else
-        log.level = Log4r::INFO
+        log.level = Logger::INFO
       end
     end
 

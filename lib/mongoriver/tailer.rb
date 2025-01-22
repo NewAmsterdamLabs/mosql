@@ -1,0 +1,216 @@
+module Mongoriver
+  class Tailer
+    include Mongoriver::Logging
+    include Mongoriver::Assertions
+
+    attr_reader :upstream_conn
+    attr_reader :oplog
+    attr_reader :database_type
+
+    def initialize(upstreams, type, oplog = "oplog.rs")
+      @upstreams = upstreams
+      @type = type
+      @oplog = oplog
+      # This number seems high
+      @conn_opts = {:op_timeout => 86400}
+
+      @cursor = nil
+      @stop = false
+      @streaming = false
+
+      connect_upstream
+      @database_type = Mongoriver::Toku.conversion_needed?(@upstream_conn) ? :toku : :mongo
+    end
+
+    # Return a position for a record object
+    #
+    # @return [BSON::Timestamp] if mongo
+    # @return [BSON::Binary] if tokumx
+    def position(record)
+      return nil unless record
+      case database_type
+      when :mongo
+        return record['ts']
+      when :toku
+        return record['_id']
+      end
+    end
+
+    # Return a time for a record object
+    # @return Time
+    def time_for(record)
+      return nil unless record
+      case database_type
+      when :mongo
+        return Time.at(record['ts'].seconds)
+      when :toku
+        return record['ts']
+      end
+    end
+
+    # Find the most recent entry in oplog and return a position for that
+    # position. The position can be passed to the tail function (or run_forever)
+    # and the tailer will start tailing after that.
+    # If before_time is given, it will return the latest position before (or at) time.
+    def most_recent_position(before_time=nil)
+      position(latest_oplog_entry(before_time))
+    end
+
+    def latest_oplog_entry(before_time=nil)
+      query = {}
+      if before_time
+        case database_type
+        when :mongo
+          ts = BSON::Timestamp.new(before_time.to_i + 1, 0)
+        when :toku
+          ts = before_time + 1
+        end
+        query = { 'ts' => { '$lt' => ts } }
+      end
+
+      case database_type
+      when :mongo
+        record = oplog_collection.find_one(query, :sort => [['$natural', -1]])
+      when :toku
+        record = oplog_collection.find_one(query, :sort => [['_id', -1]])
+      end
+      record
+    end
+
+    def connect_upstream
+      case @type
+      when :replset
+        opts = @conn_opts.merge(:read => :secondary)
+        @upstream_conn = Mongo::ReplSetConnection.new(@upstreams, opts)
+      when :slave, :direct
+        opts = @conn_opts.merge(:slave_ok => true)
+        host, port = parse_direct_upstream
+        @upstream_conn = Mongo::Connection.new(host, port, opts)
+        raise "Server at #{@upstream_conn.host}:#{@upstream_conn.port} is the primary -- if you're ok with that, check why your wrapper is passing :direct rather than :slave" if @type == :slave && @upstream_conn.primary?
+        ensure_upstream_replset!
+      when :existing
+        raise "Must pass in a single existing Mongo::Connection with :existing" unless @upstreams.length == 1 && @upstreams[0].respond_to?(:db)
+        @upstream_conn = @upstreams[0]
+      else
+        raise "Invalid connection type: #{@type.inspect}"
+      end
+    end
+
+    def connection_config
+      @upstream_conn.db('admin').command(:ismaster => 1)
+    end
+
+    def ensure_upstream_replset!
+      # Might be a better way to do this, but not seeing one.
+      config = connection_config
+      unless config['setName']
+        raise "Server at #{@upstream_conn.host}:#{@upstream_conn.port} is not running as a replica set"
+      end
+    end
+
+    def parse_direct_upstream
+      raise "When connecting directly to a mongo instance, must provide a single upstream" unless @upstreams.length == 1
+      upstream = @upstreams[0]
+      parse_host_spec(upstream)
+    end
+
+    def parse_host_spec(host_spec)
+      host, port = host_spec.split(':')
+      host = '127.0.0.1' if host.to_s.length == 0
+      port = '27017' if port.to_s.length == 0
+      [host, port.to_i]
+    end
+
+    def oplog_collection
+      @upstream_conn.db('local').collection(oplog)
+    end
+
+    # Start tailing the oplog.
+    # 
+    # @param [Hash]
+    # @option opts [BSON::Timestamp, BSON::Binary] :from Placeholder indicating 
+    #           where to start the query from. Binary value is used for tokumx.
+    #           The timestamp is non-inclusive.
+    # @option opts [Hash] :filter Extra filters for the query.
+    # @option opts [Bool] :dont_wait(false) 
+    def tail(opts = {})
+      raise "Already tailing the oplog!" if @cursor
+
+      query = build_tail_query(opts)
+
+      mongo_opts = {:timeout => false}.merge(opts[:mongo_opts] || {})
+
+      oplog_collection.find(query, mongo_opts) do |oplog|
+        oplog.add_option(Mongo::Constants::OP_QUERY_TAILABLE)
+        oplog.add_option(Mongo::Constants::OP_QUERY_OPLOG_REPLAY) if query['ts']
+        oplog.add_option(Mongo::Constants::OP_QUERY_AWAIT_DATA) unless opts[:dont_wait]
+
+        log.debug("Starting oplog stream from #{opts[:from] || 'start'}")
+        @cursor = oplog
+      end
+    end
+
+    # Deprecated: use #tail(:from => ts, ...) instead
+    def tail_from(ts, opts={})
+      opts.merge(:from => ts)
+      tail(opts)
+    end
+
+    def tailing
+      !@stop || @streaming
+    end
+
+    def stream(limit=nil, &blk)
+      count = 0
+      @streaming = true
+      state = TailerStreamState.new(limit)
+      while !@stop && !state.break? && @cursor.has_next?
+        state.increment
+
+        record = @cursor.next
+
+        case database_type
+        when :mongo
+          blk.call(record, state)
+        when :toku
+          converted = Toku.convert(record, @upstream_conn)
+          converted.each do |converted_record|
+            blk.call(converted_record, state)
+          end
+        end
+      end
+      @streaming = false
+
+      return @cursor.has_next?
+    end
+
+    def stop
+      @stop = true
+    end
+
+    def close
+      @cursor.close if @cursor
+      @cursor = nil
+      @stop = false
+    end
+
+    private
+    def build_tail_query(opts = {})
+      query = opts[:filter] || {}
+      return query unless opts[:from]
+
+      case database_type
+      when :mongo
+        assert(opts[:from].is_a?(BSON::Timestamp),
+          "For mongo databases, tail :from must be a BSON::Timestamp")
+        query['ts'] = { '$gt' => opts[:from] }
+      when :toku
+        assert(opts[:from].is_a?(BSON::Binary),
+          "For tokumx databases, tail :from must be a BSON::Binary")
+        query['_id'] = { '$gt' => opts[:from] }
+      end
+
+      query
+    end
+  end
+end
