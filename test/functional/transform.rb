@@ -19,7 +19,7 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
       'stringy'
     ],
     [
-      BSON::DBRef.new({'db.otherns' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
+      BSON::DBRef.new({'$ref' => 'db.otherns', '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
       'TEXT',
       '5405fae77c584947fc000001'
     ],
@@ -41,16 +41,16 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
     ],
     [
       [
-        BSON::DBRef.new({'db.otherns' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
-        BSON::DBRef.new({'db.otherns' => BSON::ObjectId.from_string('5405fae77c584947fc000002')})
+        BSON::DBRef.new({'$ref' => db.otherns, '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
+        BSON::DBRef.new({'$ref' => 'db.otherns', '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000002')})
       ],
       'TEXT ARRAY',
       ['5405fae77c584947fc000001', '5405fae77c584947fc000002']
     ],
     [
       [
-        BSON::DBRef.new({'db.otherns' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
-        BSON::DBRef.new({'db.otherns' => BSON::ObjectId.from_string('5405fae77c584947fc000002')})
+        BSON::DBRef.new({'$ref' => 'db.otherns', '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
+        BSON::DBRef.new({'$ref' => 'db.otherns', '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000002')})
       ],
       'TEXT',
       ['5405fae77c584947fc000001', '5405fae77c584947fc000002'].to_json
