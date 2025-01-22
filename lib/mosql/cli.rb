@@ -114,7 +114,7 @@ module MoSQL
 
       optparse.parse!(@args)
       
-      log = Logger::Logger.new(STDERR, 'Stripe')
+      log = Logger::Logger.new($stderr, progname: 'Stripe')
       if options[:verbose] >= 1
         log.level = Logger::DEBUG
       else
