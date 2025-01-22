@@ -198,13 +198,13 @@ EOF
     it 'extracts object ids from a DBRef' do
       oid = BSON::ObjectId.new
       out = @map.transform('db.collection', {'_id' => "row 1",
-          'str' => BSON::DBRef.new('db.otherns', oid)})
+          'str' => BSON::DBRef.new({'db.otherns' => oid })})
       assert_equal(["row 1", nil, oid.to_s, nil], out)
     end
 
     it 'converts DBRef to object id in arrays' do
       oid = [ BSON::ObjectId.new, BSON::ObjectId.new]
-      o = {'_id' => "row 1", "str" => [ BSON::DBRef.new('db.otherns', oid[0]), BSON::DBRef.new('db.otherns', oid[1]) ] }
+      o = {'_id' => "row 1", "str" => [ BSON::DBRef.new({'db.otherns' => oid[0]}), BSON::DBRef.new({'db.otherns' => oid[1]}) ] }
       out = @map.transform('db.collection', o)
       assert_equal(["row 1", nil, JSON.dump(oid.map! {|o| o.to_s}), nil ], out)
     end
@@ -213,7 +213,7 @@ EOF
       out = @map.transform('db.with_extra_props', {'_id' => 7, 'nancy' => 0.0/0.0})
       extra = JSON.parse(out[1])
       assert(extra.key?('nancy'))
-      assert_equal(nil, extra['nancy'])
+      assert_nil(extra['nancy'])
     end
 
     it 'base64-encodes BSON::Binary blobs in extra_props' do
@@ -247,7 +247,11 @@ EOF
 
   describe 'fetch_and_delete_dotted' do
     def check(orig, path, expect, result)
-      assert_equal(expect, @map.fetch_and_delete_dotted(orig, path))
+      if expect.nil?
+        assert_nil(@map.fetch_and_delete_dotted(orig, path))
+      else
+        assert_equal(expect, @map.fetch_and_delete_dotted(orig, path))
+      end
       assert_equal(result, orig)
     end
 
