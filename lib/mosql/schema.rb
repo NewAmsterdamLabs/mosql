@@ -195,9 +195,9 @@ module MoSQL
         v.to_s
       when BSON::Binary
         if type.downcase == 'uuid'
-          v.to_s.unpack("H*").first
+          v.data.to_s.unpack("H*").first
         else
-          Sequel::SQL::Blob.new(v.to_s)
+          Sequel::SQL::Blob.new(v.data.to_s)
         end
       when BSON::DBRef
         v.id.to_s
@@ -268,8 +268,7 @@ module MoSQL
       when Array
         value.map {|v| sanitize(v)}
       when BSON::Binary
-        log.debug { "Base64-encoding #{value.to_s.inspect}" }
-        Base64.encode64(value.to_s)
+        Base64.encode64(value.data.to_s)
       when Float
         # NaN is illegal in JSON. Translate into null.
         value.nan? ? nil : value
