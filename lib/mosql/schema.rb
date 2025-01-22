@@ -189,8 +189,9 @@ module MoSQL
     end
 
     def transform_primitive(v, type=nil)
+      log.debug { "Transforming primitive #{v.inspect} #{v.class}" }
       case v
-      when BSON::ObjectId, Symbol
+      when BSON::ObjectId, Symbol, BSON::Symbol
         v.to_s
       when BSON::Binary
         if type.downcase == 'uuid'
@@ -199,7 +200,7 @@ module MoSQL
           Sequel::SQL::Blob.new(v.to_s)
         end
       when BSON::DBRef
-        v.object_id.to_s
+        v.id.to_s
       else
         v
       end
@@ -214,7 +215,7 @@ module MoSQL
       # mutating embedded objects.
       #obj = BSON.deserialize(BSON.serialize(obj))
       obj = Hash.from_bson(obj.to_bson)
-      log.debug { "Cloned: #{original.inspect} to #{obj.inspect}" }
+      log.debug { "Cloned: #{original.inspect} (#{original.class}) to #{obj.inspect}" }
 
       row = []
       schema[:columns].each do |col|
@@ -227,6 +228,9 @@ module MoSQL
         else
           v = fetch_and_delete_dotted(obj, source)
           case v
+            # DBRef is a hash, so make sure to not process with the logic of a hash otherwise all properties will be considered
+          when BSON::DBRef
+            v = transform_primitive(v, type)
           when Hash
             v = JSON.dump(Hash[v.map { |k,v| [k, transform_primitive(v)] }])
           when Array
@@ -264,6 +268,7 @@ module MoSQL
       when Array
         value.map {|v| sanitize(v)}
       when BSON::Binary
+        log.debug { "Base64-encoding #{value.to_s.inspect}" }
         Base64.encode64(value.to_s)
       when Float
         # NaN is illegal in JSON. Translate into null.
