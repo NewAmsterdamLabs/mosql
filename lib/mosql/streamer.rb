@@ -29,7 +29,7 @@ module MoSQL
 
     def collection_for_ns(ns)
       dbname, collection = ns.split(".", 2)
-      @mongo.db(dbname).collection(collection)
+      @mongo.use(dbname)[collection]
     end
 
     def unsafe_handle_exceptions(ns, obj)
@@ -114,7 +114,7 @@ module MoSQL
         end
 
         log.info("Importing for Mongo DB #{dbname}...")
-        db = @mongo.db(dbname)
+        db = @mongo.use(dbname)
         collections = db.collections.select { |c| spec.key?(c.name) }
 
         collections.each do |collection|
@@ -179,7 +179,7 @@ module MoSQL
     end
 
     def sync_object(ns, selector)
-      obj = collection_for_ns(ns).find_one(selector)
+      obj = collection_for_ns(ns).find(selector).limit(1).first
       if obj
         unsafe_handle_exceptions(ns, obj) do
           @sql.upsert_ns(ns, obj)

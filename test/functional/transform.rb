@@ -41,7 +41,7 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
     ],
     [
       [
-        BSON::DBRef.new({'$ref' => db.otherns, '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
+        BSON::DBRef.new({'$ref' => 'db.otherns', '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000001')}),
         BSON::DBRef.new({'$ref' => 'db.otherns', '$id' => BSON::ObjectId.from_string('5405fae77c584947fc000002')})
       ],
       'TEXT ARRAY',
@@ -84,7 +84,7 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
       schema = MoSQL::Schema.new(map)
       adapter = MoSQL::SQLAdapter.new(schema, sql_test_uri)
       @sequel.drop_table?(:test_transform)
-      collection = @mongo['test']['test_transform']
+      collection = @mongo.use('test')['test_transform']
       collection.drop
 
       schema.create_schema(@sequel)

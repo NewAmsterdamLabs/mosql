@@ -6,14 +6,14 @@ require_relative './cursor_stub'
 
 def mocked_mongo()
   mongo_connection = stub()
-  db = stub()
+  use = stub()
   collection = stub()
-
-  mongo_connection.expects(:db).with('_mongoriver').returns(db)
-  db.expects(:collection).with('oplog-tailers').returns(collection)
+  mongo_connection.expects(:use).with('_mongoriver').returns({ 'oplog-tailers' => collection })
 
   # mongodb
-  mongo_connection.expects(:server_info).at_least_once.returns({})
+  buildinfo_command = stub()
+  buildinfo_command.expects(:documents).returns([{}])
+  mongo_connection.expects(:command).with(:buildinfo => 1).returns(buildinfo_command)
 
   [mongo_connection, collection]
 end

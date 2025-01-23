@@ -23,8 +23,8 @@ Gem::Specification.new do |gem|
   gem.add_runtime_dependency "json", "2.9.1"
 
   gem.add_runtime_dependency "mongo", "~> 2.2"
-  gem.add_runtime_dependency "bson", "~> 5.0"
+  gem.add_runtime_dependency "bson", "5.0.2"
 
-  gem.add_development_dependency "minitest"
-  gem.add_development_dependency "mocha"
+  gem.add_development_dependency "minitest", "~> 5.25"
+  gem.add_development_dependency "mocha", "~> 2.7"
 end

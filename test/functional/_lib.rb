@@ -37,8 +37,8 @@ EOF
 
     def connect_mongo
       begin
-        Mongo::Connection.from_uri(mongo_test_uri)
-      rescue Mongo::ConnectionFailure, Mongo::ConnectionError
+        Mongo::Client.new(mongo_test_uri, { database: mongo_test_dbname })
+      rescue Mongo::Error
         $stderr.puts <<EOF
 
 *********************************************************************
