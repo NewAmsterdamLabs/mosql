@@ -1,7 +1,22 @@
 # MoSQL: a MongoDB → SQL streaming translator
 
-> _**MoSQL is no longer being actively maintained.**_
-> _If you are interested in helping maintain this repository, please let us know.  We would love for it to find a forever home with someone who can give it the love it needs!_
+This project is a fork from the original [MoSQL](https://github.com/stripe/mosql)
+done by Stripe and which has been working flawlessly for us for many years.
+
+As of Mongo 5.x, the oplog format has changed and this project is 
+not compatible with the new oplog format. Rather ChangeStreams should be used instead.
+
+The following changes have been made to the code:
+
+- Added support for mongo driver 2.x and BSON 5.x
+- Added support for Sequel 5.x and pg 1.5
+- Replaced log4r by logger
+- Updated mocha and minitest
+
+
+The original README is below:
+
+
 
 At Stripe, we love MongoDB. We love the flexibility it gives us in
 changing data schemas as we grow and learn, and we love its
@@ -164,7 +179,7 @@ If you need to force a fresh reimport, run `--reimport`, which will
 cause `mosql` to drop tables, create them anew, and do another import.
 
 Normaly, MoSQL will scan through a list of the databases on the mongo
-server you connect to. You avoid this behavior by specifiying a specific
+server you connect to. You avoid this behavior by specifying a specific
 mongo db to connect to with the `--only-db [dbname]` option. This is
 useful for hosted services which do not let you list all databases (via
 the `listDatabases` command).
@@ -246,20 +261,28 @@ yet.
 
 # Development
 
-Patches and contributions are welcome! Please fork the project and
-open a pull request on [github][github], or just report issues.
+You can use Docker compose to run mongo and postgres for testing:
 
-MoSQL includes a small but hopefully-growing test suite. It assumes a
-running PostgreSQL and MongoDB instance on the local host. To run the
-test suite, first install all of MoSQL's dependencies:
+mongo will run on port 27018 and postgres will run on port 5433.
+
+```shell
+docker compose up
+```
+
+Then, build the gem:
+
 ```shell
 bundle install
 ```
 Then, run the tests:
+
 ```shell
+export MONGOSQL_TEST_SQL=postgres://test:test@localhost:5433/mosql
+export MONGOSQL_TEST_MONGO=mongodb://test:test@localhost:27018
+export MONGOSQL_TEST_MONGO_DB=admin
 rake test
 ```
-You can also point the suite at a different target via environment
-variables; See `test/functional/_lib.rb` for more information.
+
+See `test/functional/_lib.rb` for more information.
 
 [github]: https://github.com/stripe/mosql
