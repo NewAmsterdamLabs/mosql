@@ -68,11 +68,12 @@ module MoSQL
       tries.times do |try|
         begin
           yield
-        rescue Mongo::ConnectionError, Mongo::ConnectionFailure, Mongo::OperationFailure => e
+          # TODO find replacement for Mongo::ConnectionError, Mongo::ConnectionFailure,
+        rescue Mongo::Error::OperationFailure => e
           # Duplicate key error
-          raise if e.kind_of?(Mongo::OperationFailure) && [11000, 11001].include?(e.error_code)
+          raise if e.kind_of?(Mongo::Error::OperationFailure) && [11000, 11001].include?(e.error_code)
           # Cursor timeout
-          raise if e.kind_of?(Mongo::OperationFailure) && e.message =~ /^Query response returned CURSOR_NOT_FOUND/
+          raise if e.kind_of?(Mongo::Error::OperationFailure) && e.message =~ /^Query response returned CURSOR_NOT_FOUND/
           delay = 0.5 * (1.5 ** try)
           log.warn("Mongo exception: #{e}, sleeping #{delay}s...")
           sleep(delay)
@@ -141,21 +142,21 @@ module MoSQL
 
       start    = Time.now
       sql_time = 0
-      collection.find(filter, :batch_size => options[:batch_size]) do |cursor|
-        with_retries do
-          cursor.each do |obj|
-            batch << @schema.transform(ns, obj)
-            count += 1
+      batch_len = options[:batch_size] || 1000
+      with_retries do
+        #*options[:batch_size]
+        collection.find(filter, :batch_size => batch_len).each do |obj|
+          batch << @schema.transform(ns, obj)
+          count += 1
 
-            if batch.length >= options[:batch_size]
-              sql_time += track_time do
-                bulk_upsert(table, ns, batch)
-              end
-              elapsed = Time.now - start
-              log.info("Imported #{count} rows (#{elapsed}s, #{sql_time}s SQL)...")
-              batch.clear
-              exit(0) if @done
+          if batch.length >= batch_len
+            sql_time += track_time do
+              bulk_upsert(table, ns, batch)
             end
+            elapsed = Time.now - start
+            log.info("Imported #{count} rows (#{elapsed}s, #{sql_time}s SQL)...")
+            batch.clear
+            exit(0) if @done
           end
         end
       end

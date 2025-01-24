@@ -4,7 +4,8 @@ module Mongoriver
     # @returns true if conn is a TokuMX database and the oplog records need to 
     #               be converted 
     def self.conversion_needed?(conn)
-      conn.server_info.has_key? "tokumxVersion"
+      server_info = conn.command({:buildinfo => 1}).documents.first
+      server_info.has_key? "tokumxVersion"
     end
 
     def self.operations_for(record, conn=nil)

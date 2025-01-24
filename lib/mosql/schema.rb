@@ -307,7 +307,8 @@ module MoSQL
         pg.put_copy_end
         begin
           pg.get_result.check
-        rescue PGError => e
+          # is it from Sequel or pg gem
+        rescue Sequel::Postgres::PGError  => e
           db.send(:raise_error, e)
         end
       end

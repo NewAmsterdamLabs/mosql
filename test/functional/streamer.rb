@@ -221,7 +221,7 @@ EOF
       @streamer.options[:skip_tail] = true
       @streamer.initial_import
 
-      collection.update({ '_id' => { 's' => 'asdf', 't' => date}}, { '$set' => { 'var' => 'new_data'}})
+      collection.update_one({ '_id' => { 's' => 'asdf', 't' => date}}, { '$set' => { 'var' => 'new_data'}})
       @streamer.handle_op({'ns' => 'composite_key_test.collection',
                            'op' => 'u',
                            'o2' => { '_id' => { 's' => 'asdf', 't' => date}},
@@ -383,6 +383,7 @@ EOF
     it 'preserves milliseconds on tailing' do
       ts = Time.utc(2006,01,02, 15,04,05,678000)
       id = mongo.use('db')['has_timestamp'].insert_one({ts: ts})
+      o =  mongo.use('db')['has_timestamp'].find({_id: id}).first
       @streamer.handle_op(
         {
           "ts" => {"t" => 1408647630, "i" => 4},
@@ -390,7 +391,7 @@ EOF
           "v"  => 2,
           "op" => "i",
           "ns" => "db.has_timestamp",
-          "o"  => mongo.use('db')['has_timestamp'].find_one({_id: id})
+          "o"  => o
         })
       got = @sequel[:has_timestamp].where(:_id => id.to_s).select.first[:ts]
       assert_equal(ts.to_i, got.to_i)

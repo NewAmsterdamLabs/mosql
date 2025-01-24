@@ -96,7 +96,7 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
 
       # Test initial import
       id = 'imported'
-      collection.insert({_id: id, value: mongo})
+      collection.insert_one({_id: id, value: mongo})
       streamer.initial_import
 
       got = @sequel[:test_transform].where(_id: id).to_a
@@ -104,7 +104,7 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
 
       # Test streaming an insert
       id = 'inserted'
-      collection.insert({_id: id, value: mongo})
+      collection.insert_one({_id: id, value: mongo})
       streamer.handle_op(
         {
           "ts" => {"t" => 1408647630, "i" => 4},
@@ -112,7 +112,7 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
           "v"  => 2,
           "op" => "i",
           "ns" => "test.test_transform",
-          "o"  => collection.find_one(_id: id)
+          "o"  => collection.find(_id: id).first
         })
 
       got = @sequel[:test_transform].where(_id: id).to_a

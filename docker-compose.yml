@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
-      POSTGRES_DB: test
+      POSTGRES_DB: mosql
     ports:
       - "5433:5432"
 
@@ -24,10 +24,12 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: test
       MONGO_INITDB_ROOT_PASSWORD: test
+      MONGO_INITDB_DATABASE: admin
     ports:
       - "27018:27017"
     volumes:
       - mongo_data:/data/db
+      - ./docker/mongo/db-init.js:/docker-entrypoint-initdb.d/db-init.js
     networks:
       - db_network
 
