@@ -333,7 +333,7 @@ EOF
     it 'imports from all dbs' do
       ids = (1.upto(4)).map { BSON::ObjectId.new }
       ids.each_with_index do |_id, i|
-        collection = mongo.user("test_#{i}")['collection']
+        collection = mongo.use("test_#{i}")['collection']
         collection.drop
         collection.insert_one({:_id => _id, :var => i}, :w => 1)
       end

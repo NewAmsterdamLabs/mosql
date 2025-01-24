@@ -61,7 +61,9 @@ module MoSQL
       @map = {}
       map.each do |dbname, db|
         @map[dbname] = { :meta => parse_meta(db[:meta]) }
-        db.sort.each do |tuple|
+        # TODO previously was sorting to do consistent iteration
+        db.each do |tuple|
+          log.debug("Parsing #{dbname}.#{tuple.inspect}")
           cname = tuple[0]
           spec = tuple[1]
 
