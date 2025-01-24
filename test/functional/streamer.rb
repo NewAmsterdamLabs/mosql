@@ -382,7 +382,7 @@ EOF
 
     it 'preserves milliseconds on tailing' do
       ts = Time.utc(2006,01,02, 15,04,05,678000)
-      id = mongo.use('db')['has_timestamp'].insert_one({ts: ts})
+      id = mongo.use('db')['has_timestamp'].insert_one({ts: ts}).inserted_id
       o =  mongo.use('db')['has_timestamp'].find({_id: id}).first
       @streamer.handle_op(
         {
