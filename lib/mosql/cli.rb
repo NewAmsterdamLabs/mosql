@@ -164,7 +164,7 @@ module MoSQL
       @tailer = MoSQL::Tailer.new([@mongo], :existing, metadata_table,
                                   :service => options[:service])
 
-      @streamer = Streamer.new(:options => @options,
+      @streamer = OplogStreamer.new(:options => @options,
                                :tailer  => @tailer,
                                :mongo   => @mongo,
                                :sql     => @sql,

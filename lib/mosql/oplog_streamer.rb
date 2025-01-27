@@ -1,5 +1,5 @@
 module MoSQL
-  class Streamer
+  class OplogStreamer
     include MoSQL::Logging
 
     attr_reader :options, :tailer

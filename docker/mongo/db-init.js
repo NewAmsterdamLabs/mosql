@@ -1,3 +1,5 @@
+rs.initiate({ _id: "rs0"});
+
 db.grantRolesToUser("test",[{role:"readWrite",db:"test"}])
 db = db.getSiblingDB('test')
 

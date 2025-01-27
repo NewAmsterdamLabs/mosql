@@ -12,6 +12,7 @@ require 'mocha/minitest'
 
 module MoSQL
   class Test < ::Minitest::Spec
+    include MoSQL::Logging
     def setup
       # Put any stubs here that you want to apply globally
     end

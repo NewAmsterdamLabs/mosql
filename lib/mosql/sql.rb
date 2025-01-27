@@ -19,7 +19,8 @@ module MoSQL
                                end
                                conn.execute("SET search_path TO \"#{pgschema}\"")
                              end
-                           end)
+      end)
+      @db.loggers << log
     end
 
     def table_for_ns(ns)

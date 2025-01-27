@@ -1,9 +1,9 @@
 require File.join(File.dirname(__FILE__), '_lib.rb')
 require 'mosql/cli'
 
-class MoSQL::Test::Functional::StreamerTest < MoSQL::Test::Functional
+class MoSQL::Test::Functional::OplogStreamerTest < MoSQL::Test::Functional
   def build_streamer
-    MoSQL::Streamer.new(:mongo => mongo,
+    MoSQL::OplogStreamer.new(:mongo => mongo,
                         :tailer => nil,
                         :options => {},
                         :sql => @adapter,

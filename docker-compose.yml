@@ -1,5 +1,6 @@
 services:
   postgres:
+    container_name: postgres
     image: postgres:16-alpine
     restart: always
     env_file:
@@ -17,8 +18,19 @@ services:
       - db_network
 
   mongo:
-    image: mongo:5
+    container_name: mongo
+    image: mongo:6
     restart: always
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "27017", '--keyFile', "/data/keyfile" ]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'host.docker.internal:27017'}]}) }" | mongosh --port 27017 -u test -p test
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      start_interval: 1s
+      retries: 30
     env_file:
       - .env
     environment:
@@ -30,6 +42,7 @@ services:
     volumes:
       - mongo_data:/data/db
       - ./docker/mongo/db-init.js:/docker-entrypoint-initdb.d/db-init.js
+      - ./docker/mongo/keyfile.cert:/data/keyfile:ro
     networks:
       - db_network
 
@@ -39,3 +52,4 @@ volumes:
 
 networks:
   db_network:
+    driver: bridge
