@@ -154,6 +154,71 @@ EOF
       assert_equal(100, sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:var])
       assert_nil(sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:arry])
     end
+
+    it 'handle "replace"' do
+      o = { '_id' => BSON::ObjectId.new, 'var' => 17, 'arry' => [1, 2, 3] }
+      @adapter.upsert_ns('mosql_test.collection', o)
+      assert_equal(17, sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:var])
+
+      @streamer.handle_op(BSON::Document.new(
+        {
+          "clusterTime"=>BSON::Timestamp.new(1737859517, 2),
+          "wallTime" => Time.at(1737859517, 556, :millisecond).utc.to_bson,
+          "_id"=>{"_data"=>"TOKEN"},
+          "operationType"=>"replace",
+          "ns" => {"db"=>"mosql_test", "coll"=>"collection"},
+          "documentKey"=>{"_id"=> o['_id']},
+          "fullDocument" => {
+            "_id"=> o['_id'],
+            'var' => 100,
+          }
+        }))
+      assert_equal(100, sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:var])
+      assert_nil(sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:arry])
+    end
+
+    it 'handle "insert" existing record' do
+      o = { '_id' => BSON::ObjectId.new, 'var' => 17 }
+      @adapter.upsert_ns('mosql_test.collection', o)
+      assert_equal(17, sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:var])
+
+      @streamer.handle_op(BSON::Document.new(
+        {
+          "clusterTime"=>BSON::Timestamp.new(1737859517, 2),
+          "wallTime" => Time.at(1737859517, 556, :millisecond).utc.to_bson,
+          "_id"=>{"_data"=>"TOKEN"},
+          "operationType"=>"insert",
+          "ns" => {"db"=>"mosql_test", "coll"=>"collection"},
+          "documentKey"=>{"_id"=> o['_id']},
+          "fullDocument" => {
+            "_id"=> o['_id'],
+            'var' => 100,
+          }
+        }))
+      assert_equal(100, sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:var])
+      assert_nil(sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:arry])
+    end
+
+    it 'handle "insert" with no existing record' do
+      o = { '_id' => BSON::ObjectId.new }
+
+      @streamer.handle_op(BSON::Document.new(
+        {
+          "clusterTime"=>BSON::Timestamp.new(1737859517, 2),
+          "wallTime" => Time.at(1737859517, 556, :millisecond).utc.to_bson,
+          "_id"=>{"_data"=>"TOKEN"},
+          "operationType"=>"insert",
+          "ns" => {"db"=>"mosql_test", "coll"=>"collection"},
+          "documentKey"=>{"_id"=> o['_id']},
+          "fullDocument" => {
+            "_id"=> o['_id'],
+            'var' => 100,
+            'arry' => [1, 2, 3]
+          }
+        }))
+      assert_equal(100, sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:var])
+      assert_equal([1, 2, 3], sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:arry])
+    end
   end
 
 
