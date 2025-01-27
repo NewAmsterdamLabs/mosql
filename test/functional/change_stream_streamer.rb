@@ -29,30 +29,17 @@ mosql_test:
         :source: _id
         :type: TEXT
       - goats: INTEGER
-
-filter_test:
-  collection:
+  dotted_test:
     :meta:
-      :table: filter_sqltable
-      :filter:
-        :_id:
-          '$gte': !ruby/object:BSON::ObjectId
-            data:
-            - 83
-            - 179
-            - 75
-            - 128
-            - 0
-            - 0
-            - 0
-            - 0
-            - 0
-            - 0
-            - 0
-            - 0
+      :table: dotted_table
     :columns:
       - _id: TEXT
-      - var: INTEGER
+      - sku_id:
+        :source: sku._id
+        :type: TEXT
+      - sku_name:
+        :source: sku.name
+        :type: TEXT
 
 composite_key_test:
   collection:
@@ -77,6 +64,7 @@ EOF
 
       @sequel.drop_table?(:sqltable)
       @sequel.drop_table?(:sqltable2)
+      @sequel.drop_table?(:dotted_table)
       @sequel.drop_table?(:composite_table)
       @map.create_schema(@sequel)
 
@@ -218,6 +206,35 @@ EOF
         }))
       assert_equal(100, sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:var])
       assert_equal([1, 2, 3], sequel[:sqltable].where(:_id => o['_id'].to_s).select.first[:arry])
+    end
+
+    it 'handle "update" with dotted fields' do
+      o = { '_id' => BSON::ObjectId.new, 'var' => 17, 'sku' => {
+        '_id' => BSON::ObjectId.new, 'name' => 'test'
+      } }
+      @adapter.upsert_ns('mosql_test.dotted_test', o)
+      assert_equal(o['sku']['_id'].to_s, sequel[:dotted_table].where(:_id => o['_id'].to_s).select.first[:sku_id])
+      assert_equal(o['sku']['name'], sequel[:dotted_table].where(:_id => o['_id'].to_s).select.first[:sku_name])
+
+      # updates are a hack where we read the object mongo so make sure the new object exists in mongo
+      updated_o = o.merge('sku' => o['sku'].merge({"name" => "test2"}))
+      mongo.use('mosql_test')['dotted_test'].insert_one(updated_o, :w => 1)
+      @streamer.handle_op(BSON::Document.new(
+        {
+          "clusterTime"=>BSON::Timestamp.new(1737859517, 2),
+          "wallTime" => Time.at(1737859517, 556, :millisecond).utc.to_bson,
+          "_id"=>{"_data"=>"TOKEN"},
+          "operationType"=>"update",
+          "ns" => {"db"=>"mosql_test", "coll"=>"dotted_test"},
+          "documentKey"=>{"_id"=> o['_id']},
+          "updateDescription" => {
+            "updatedFields"  => { 'sku' => {"name" => "not_using_this"} },
+            "removedFields" => [],
+            "truncatedArrays" => []
+          }
+        }))
+      assert_equal(o['sku']['_id'].to_s, sequel[:dotted_table].where(:_id => o['_id'].to_s).select.first[:sku_id])
+      assert_equal('test2', sequel[:dotted_table].where(:_id => o['_id'].to_s).select.first[:sku_name])
     end
   end
 
