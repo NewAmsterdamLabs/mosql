@@ -360,7 +360,7 @@ module MoSQL
         keys << ns[:columns].find {|c| c[:source] == '_id'}[:name]
       end
 
-      return keys
+      keys
     end
   end
 end
