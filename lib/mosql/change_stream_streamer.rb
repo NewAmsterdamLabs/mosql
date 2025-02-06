@@ -1,8 +1,42 @@
 module MoSQL
   class ChangeStreamStreamer < MoSQL::BaseStreamer
+    attr_reader :options, :tailer
 
-    def initialize(opts, mongo, sql, schema)
+    def initialize(opts, tailer, mongo, sql, schema)
       super(opts, mongo, sql, schema)
+      @tailer = tailer
+    end
+
+    def stop
+      super
+      @tailer.stop
+    end
+
+    def import
+      if options[:reimport] #|| tailer.read_position.nil?
+        initial_import
+      end
+    end
+
+    def initial_import
+      @schema.create_schema(@sql.db, !options[:no_drop_tables])
+    end
+
+    def optail
+      tail_from = options[:tail_from]
+      if tail_from.nil?
+        tail_from = tailer.read_position
+      end
+      stream_enum = tailer.watch(tail_from)
+      until @done
+        tailer.stream do |bson_doc, resume_token|
+          log.debug("Handling doc: #{bson_doc.inspect}")
+          handle_op(bson_doc)
+          event_time = Time.at(bson_doc["clusterTime"].seconds).to_datetime
+          # todo persist every 60s
+        end
+        sleep(1)
+      end
     end
 
     def handle_op(change_doc)

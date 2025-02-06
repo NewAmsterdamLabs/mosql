@@ -36,7 +36,8 @@ module MoSQL
         :sql    => 'postgres:///',
         :mongo  => 'mongodb://localhost',
         :batch_size => 1000,
-        :verbose => 0
+        :verbose => 0,
+        :stream => 'oplog'
       }
       optparse = OptionParser.new do |opts|
         opts.banner = "Usage: #{$0} [options] "
@@ -110,11 +111,15 @@ module MoSQL
         opts.on("--oplog-filter [filter]", "An additional JSON filter for the oplog query") do |filter|
           @options[:oplog_filter] = JSON.parse(filter)
         end
+
+        opts.on("--stream [oplog|change_stream]", "Use change stream to tail oplog") do |stream|
+          @options[:stream] = stream
+        end
       end
 
       optparse.parse!(@args)
       
-      log = Logger::Logger.new($stderr, progname: 'Stripe')
+      log = Logger.new($stderr, progname: 'Stripe')
       if options[:verbose] >= 1
         log.level = Logger::DEBUG
       else
@@ -123,15 +128,16 @@ module MoSQL
     end
 
     def connect_mongo
-      @mongo = Mongo::Client.new(options[:mongo])
-      config = @mongo.use('admin').command(:ismaster => 1).documents.first
-      if !config['setName'] && !options[:skip_tail]
+      @mongo = Mongo::Client.new(options[:mongo], :logger => log)
+      config = @mongo.use('admin').command(:hello => 1).documents.first
+      replica_set = config['setName']
+      if !replica_set && !options[:skip_tail]
         log.warn("`#{options[:mongo]}' is not a replset.")
         log.warn("Will run the initial import, then stop.")
         log.warn("Pass `--skip-tail' to suppress this warning.")
         options[:skip_tail] = true
       end
-      options[:service] ||= config['setName']
+      options[:service] ||= replica_set
     end
 
     def connect_sql
@@ -158,17 +164,26 @@ module MoSQL
       load_collections
       connect_sql
       connect_mongo
+      if options[:stream] == 'oplog'
+        run_oplog
+      elsif options[:stream] == 'change_stream'
+        run_change_stream
+      end
 
+    end
+
+    def run_oplog
+      log.info("Tailing oplog...")
       metadata_table = MoSQL::Tailer.create_table(@sql.db, 'mosql_tailers')
 
       @tailer = MoSQL::Tailer.new([@mongo], :existing, metadata_table,
                                   :service => options[:service])
 
       @streamer = OplogStreamer.new(:options => @options,
-                               :tailer  => @tailer,
-                               :mongo   => @mongo,
-                               :sql     => @sql,
-                               :schema  => @schema)
+                                    :tailer  => @tailer,
+                                    :mongo   => @mongo,
+                                    :sql     => @sql,
+                                    :schema  => @schema)
 
       unless options[:skip_import]
         @streamer.import
@@ -178,5 +193,27 @@ module MoSQL
         @streamer.optail
       end
     end
+
+    def run_change_stream
+      metadata_table = MoSQL::Tailer.create_table(@sql.db, 'mosql_tailers')
+      log.info("Tailing change stream from mongo db `#{@mongo.database.name}`...")
+      log.info("Using metadata table `#{metadata_table.inspect}`...")
+      @tailer = MoSQL::ChangeStreamTailer.new(@mongo,
+                                              metadata_table,
+                                              :service => options[:service])
+      @streamer = ChangeStreamStreamer.new(@options,
+                                           @tailer,
+                                           @mongo,
+                                          @sql,
+                                          @schema)
+      unless options[:skip_import]
+        @streamer.import
+      end
+
+      unless options[:skip_tail]
+        @streamer.optail
+      end
+    end
+
   end
 end
