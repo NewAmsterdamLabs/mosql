@@ -8,6 +8,7 @@ module MoSQL
     include MoSQL::Logging
 
     attr_reader :args, :options, :tailer
+    $exit_signal = nil
 
     def self.run(args)
       cli = CLI.new(args)
@@ -24,8 +25,8 @@ module MoSQL
     def setup_signal_handlers
       %w[TERM INT USR2].each do |sig|
         Signal.trap(sig) do
-          log.info("Got SIG#{sig}. Preparing to exit...")
-          @streamer.stop
+          $exit_signal = sig
+          exit
         end
       end
     end
@@ -55,10 +56,16 @@ module MoSQL
           @options[:collections] = file
         end
 
+        if ENV['MONGOSQL_TEST_SQL']
+          @options[:sql] = ENV['MONGOSQL_TEST_SQL']
+        end
         opts.on("--sql [sqluri]", "SQL server to connect to") do |uri|
           @options[:sql] = uri
         end
 
+        if ENV['MONGOSQL_TEST_MONGO']
+          @options[:mongo] = ENV['MONGOSQL_TEST_MONGO']
+        end
         opts.on("--mongo [mongouri]", "Mongo connection string") do |uri|
           @options[:mongo] = uri
         end
@@ -118,16 +125,22 @@ module MoSQL
       end
 
       optparse.parse!(@args)
-      
-      log = Logger.new($stderr, progname: 'Stripe')
+
+      log = Logger.new($stderr, progname: 'Stripe::MoSQL')
       if options[:verbose] >= 1
         log.level = Logger::DEBUG
       else
         log.level = Logger::INFO
       end
+      log.debug("options: #{options.inspect}")
     end
 
     def connect_mongo
+      if options[:verbose] >= 1
+        log.level = Logger::DEBUG
+      else
+        log.level = Logger::INFO
+      end
       @mongo = Mongo::Client.new(options[:mongo], :logger => log)
       config = @mongo.use('admin').command(:hello => 1).documents.first
       replica_set = config['setName']
@@ -160,6 +173,14 @@ module MoSQL
     end
 
     def run
+      at_exit do
+        if $exit_signal
+          log.info("Got SIG#{$exit_signal}. Preparing to exit...")
+        end
+        if @streamer
+          @streamer.stop
+        end
+      end
       parse_args
       load_collections
       connect_sql

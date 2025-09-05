@@ -21,11 +21,11 @@ services:
     container_name: mongo
     image: mongo:6
     restart: always
-    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "27017", '--keyFile', "/data/keyfile" ]
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27018", '--keyFile', "/data/keyfile"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'host.docker.internal:27017'}]}) }" | mongosh --port 27017 -u test -p test
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27018'}]}) }" | mongosh --port 27018 -u test -p test
       interval: 5s
       timeout: 30s
       start_period: 0s
@@ -38,7 +38,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: test
       MONGO_INITDB_DATABASE: admin
     ports:
-      - "27018:27017"
+      - "27018:27018"
     volumes:
       - mongo_data:/data/db
       - ./docker/mongo/db-init.js:/docker-entrypoint-initdb.d/db-init.js
