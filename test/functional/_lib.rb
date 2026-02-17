@@ -14,6 +14,10 @@ module MoSQL
       ENV['MONGOSQL_TEST_MONGO_DB'] || 'test'
     end
 
+    def debug_mode
+      ENV['MONGOSQL_DEBUG'] || 'false'
+    end
+
     def connect_sql
       begin
         conn = Sequel.connect(sql_test_uri)
@@ -61,6 +65,11 @@ EOF
       Sequel.default_timezone = :utc
       @sequel = connect_sql
       @mongo  = connect_mongo
+      if debug_mode == 'true'
+        log.level = Logger::DEBUG
+      else
+        log.level = Logger::INFO
+      end
       super
     end
   end

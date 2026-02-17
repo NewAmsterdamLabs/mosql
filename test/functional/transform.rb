@@ -88,7 +88,7 @@ class MoSQL::Test::Functional::TransformTest < MoSQL::Test::Functional
       collection.drop
 
       schema.create_schema(@sequel)
-      streamer = MoSQL::Streamer.new(:mongo => self.mongo,
+      streamer = MoSQL::OplogStreamer.new(:mongo => self.mongo,
         :tailer => nil,
         :options => {skip_tail: true},
         :sql => adapter,

@@ -57,8 +57,10 @@ module MoSQL
       meta
     end
 
-    def initialize(map)
+    def initialize(map, options={:log_max_per_hour => 60})
       @map = {}
+      @options = options
+      @all_collections = []
       map.each do |dbname, db|
         @map[dbname] = { :meta => parse_meta(db[:meta]) }
         # TODO previously was sorting to do consistent iteration
@@ -68,6 +70,7 @@ module MoSQL
           spec = tuple[1]
 
           next unless cname.is_a?(String)
+          @all_collections << "#{dbname}.#{cname}"
           begin
             @map[dbname][cname] = parse_spec("#{dbname}.#{cname}", spec)
           rescue KeyError => e
@@ -253,7 +256,24 @@ module MoSQL
         row << JSON.dump(extra)
       end
 
-      log.debug { "Transformed: #{row.inspect}" }
+      message = "Transformed: #{row.inspect}"
+      debug_message = message
+      if message.length > 2000
+        debug_message = "#{message[0...1997]}..."
+      end
+      log.debug { debug_message }
+
+      info_message = message
+      if message.length > 1000
+        info_message = "#{message[0...997]}..."
+      end
+      collection_name = ns.split('.').last
+      total_collections = @all_collections.length
+      max_per_hour = 3
+      log_sampled("op_stream_#{ns}".to_sym, max_per_hour: max_per_hour) do |logger, count, collection_stats|
+        collections_logged_this_hour = collection_stats ? collection_stats[:collections_logged] : 0
+        logger.info("[SAMPLED #{count}/#{max_per_hour} #{collection_name} colln #{collections_logged_this_hour}/#{total_collections} this hr] #{info_message}")
+      end
 
       row
     end
@@ -270,6 +290,8 @@ module MoSQL
         value.map {|v| sanitize(v)}
       when BSON::Binary
         Base64.encode64(value.data.to_s)
+      when BSON::ObjectId
+        {"$oid" => value.to_s}
       when Float
         # NaN is illegal in JSON. Translate into null.
         value.nan? ? nil : value

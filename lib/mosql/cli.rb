@@ -38,7 +38,8 @@ module MoSQL
         :mongo  => 'mongodb://localhost',
         :batch_size => 1000,
         :verbose => 0,
-        :stream => 'oplog'
+        :stream => 'oplog',
+        :log_max_per_hour => 60
       }
       optparse = OptionParser.new do |opts|
         opts.banner = "Usage: #{$0} [options] "
@@ -122,6 +123,10 @@ module MoSQL
         opts.on("--stream [oplog|change_stream]", "Use change stream to tail oplog") do |stream|
           @options[:stream] = stream
         end
+
+        opts.on("--lm", "--log-max-per-hour [value]", "Max log messages per hour for common log messages") do |value|
+          @options[:log_max_per_hour] = value.to_i
+        end
       end
 
       optparse.parse!(@args)
@@ -164,7 +169,7 @@ module MoSQL
     def load_collections
       collections = YAML.load_file(@options[:collections])
       begin
-        @schema = MoSQL::Schema.new(collections)
+        @schema = MoSQL::Schema.new(collections, options)
       rescue MoSQL::SchemaError => e
         log.error("Error parsing collection map `#{@options[:collections]}':")
         log.error(e.to_s)
